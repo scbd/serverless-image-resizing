@@ -15,20 +15,26 @@ exports.handler = function(event, context, callback) {
   const width = parseInt(match[1], 10);
   const height = parseInt(match[2], 10);
   const originalKey = match[3];
+  let s3ObjectOptions = {};
 
   S3.getObject({Bucket: BUCKET, Key: originalKey}).promise()
-    .then(data => Sharp(data.Body)
-      .resize(width, height)
-      .toFormat('png')
-      .toBuffer()
-    )
-    .then(buffer => S3.putObject({
-        Body: buffer,
-        Bucket: BUCKET,
-        ContentType: 'image/png',
-        Key: key,
-      }).promise()
-    )
+    .then(data => {
+      s3ObjectOptions = {
+        Key :  key,
+        Metadata : data.Metadata,
+        ContentType : data.ContentType,
+        Bucket: BUCKET
+      }
+      return Sharp(data.Body)
+            .resize(width, height)
+            .max()
+            .toBuffer()
+    })
+    .then(buffer => {
+      s3ObjectOptions.Body = buffer;
+      // console.log(s3ObjectOptions);
+      S3.putObject(s3ObjectOptions).promise()
+    })
     .then(() => callback(null, {
         statusCode: '301',
         headers: {'location': `${URL}/${key}`},
